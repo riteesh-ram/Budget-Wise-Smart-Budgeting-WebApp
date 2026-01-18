@@ -8,6 +8,7 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -38,8 +39,11 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
         httpSecurity
+                .cors(Customizer.withDefaults()) // 1. Tell Spring Security to use our CORS config
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
+                        // 2. CRITICAL: Allow "OPTIONS" requests to bypass auth (Fixes Preflight 403)
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/status", "/health", "/register", "/activate", "/login").permitAll()
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -53,16 +57,16 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    // --- THE FIX: HIGHEST PRIORITY CORS FILTER ---
+    // 3. The "Nuclear" High-Priority Filter
     @Bean
     public FilterRegistrationBean<CorsFilter> corsFilter() {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
         
-        // DEBUG: Print the URL to logs to verify it's reading correctly
-        System.out.println("CORS CONFIG LOADED. ALLOWED ORIGIN: " + frontendUrl);
+        // Debug Log
+        System.out.println("CORS ORIGIN CONFIG: " + frontendUrl);
 
-        // CLEANUP: Handle spaces/nulls
+        // Robust URL Handling
         String origin = frontendUrl;
         if (origin == null || origin.trim().isEmpty()) {
             origin = "https://budgetwise-smart-budgeting.vercel.app";
@@ -70,9 +74,11 @@ public class SecurityConfig {
             origin = origin.trim().replaceAll("/$", "");
         }
 
-        config.setAllowedOrigins(List.of(origin));
+        // Use Patterns instead of Origins for better flexibility
+        config.setAllowedOriginPatterns(List.of(origin));
+        
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers"));
+        config.setAllowedHeaders(List.of("*"));
         config.setExposedHeaders(List.of("Authorization"));
         config.setAllowCredentials(true);
 
