@@ -12,7 +12,6 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -39,10 +38,10 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
         httpSecurity
-                .cors(Customizer.withDefaults()) // 1. Tell Spring Security to use our CORS config
                 .csrf(AbstractHttpConfigurer::disable)
+                // REMOVED .cors(...) to prevent the Bean conflict. 
+                // Our manual filter below handles it.
                 .authorizeHttpRequests(auth -> auth
-                        // 2. CRITICAL: Allow "OPTIONS" requests to bypass auth (Fixes Preflight 403)
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/status", "/health", "/register", "/activate", "/login").permitAll()
                         .anyRequest().authenticated())
@@ -57,26 +56,23 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    // 3. The "Nuclear" High-Priority Filter
+    // RENAMED BEAN to avoid conflict with Spring Security's default naming
     @Bean
-    public FilterRegistrationBean<CorsFilter> corsFilter() {
+    public FilterRegistrationBean<CorsFilter> corsFilterRegistrationBean() {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
         
-        // Debug Log
-        System.out.println("CORS ORIGIN CONFIG: " + frontendUrl);
+        System.out.println("CORS PATTERN LOADED: " + frontendUrl);
 
-        // Robust URL Handling
         String origin = frontendUrl;
         if (origin == null || origin.trim().isEmpty()) {
             origin = "https://budgetwise-smart-budgeting.vercel.app";
         } else {
             origin = origin.trim().replaceAll("/$", "");
         }
-
-        // Use Patterns instead of Origins for better flexibility
-        config.setAllowedOriginPatterns(List.of(origin));
         
+        // Use patterns to be safe
+        config.setAllowedOriginPatterns(List.of(origin));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setExposedHeaders(List.of("Authorization"));
@@ -84,7 +80,6 @@ public class SecurityConfig {
 
         source.registerCorsConfiguration("/**", config);
         
-        // Force this filter to run BEFORE Spring Security
         FilterRegistrationBean<CorsFilter> bean = new FilterRegistrationBean<>(new CorsFilter(source));
         bean.setOrder(Ordered.HIGHEST_PRECEDENCE);
         return bean;
