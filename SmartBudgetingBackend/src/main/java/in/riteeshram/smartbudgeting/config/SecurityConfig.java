@@ -29,17 +29,21 @@ public class SecurityConfig {
 
     private final AppUserDetailsService appUserDetailsService;
     private final JwtRequestFilter jwtRequestFilter;
+
     @Value("${money.manager.frontend.url}")
     private String frontendUrl;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
-        httpSecurity.cors(Customizer.withDefaults())
+        httpSecurity
+                // 1. CORS must be configured here explicitly
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(auth -> auth.requestMatchers("/status", "/health", "/register", "/activate", "/login").permitAll()
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/status", "/health", "/register", "/activate", "/login").permitAll()
                         .anyRequest().authenticated())
-                        .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                        .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
         return httpSecurity.build();
     }
 
@@ -51,11 +55,25 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        String origin = frontendUrl == null ? "" : frontendUrl.replaceAll("/$", "");
+
+        // 2. Robust URL handling: Handle nulls, spaces, and trailing slashes
+        String origin = frontendUrl;
+        if (origin == null || origin.trim().isEmpty()) {
+            // Fallback for safety (optional, mostly for local testing)
+            origin = "https://budgetwise-smart-budgeting.vercel.app";
+        } else {
+            // Remove trailing slash and spaces
+            origin = origin.trim().replaceAll("/$", "");
+        }
+
         configuration.setAllowedOrigins(List.of(origin));
+        
+        // 3. Allow all standard methods and headers
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers"));
+        configuration.setExposedHeaders(List.of("Authorization"));
         configuration.setAllowCredentials(true);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
