@@ -4,14 +4,12 @@ import in.riteeshram.smartbudgeting.security.JwtRequestFilter;
 import in.riteeshram.smartbudgeting.service.AppUserDetailsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -20,9 +18,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.filter.CorsFilter;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Configuration
@@ -38,11 +37,9 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
         httpSecurity
+            .cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
-                // REMOVED .cors(...) to prevent the Bean conflict. 
-                // Our manual filter below handles it.
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/status", "/health", "/register", "/activate", "/login").permitAll()
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -56,33 +53,30 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    // RENAMED BEAN to avoid conflict with Spring Security's default naming
     @Bean
-    public FilterRegistrationBean<CorsFilter> corsFilterRegistrationBean() {
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        CorsConfiguration config = new CorsConfiguration();
-        
-        System.out.println("CORS PATTERN LOADED: " + frontendUrl);
-
-        String origin = frontendUrl;
-        if (origin == null || origin.trim().isEmpty()) {
-            origin = "https://budgetwise-smart-budgeting.vercel.app";
-        } else {
-            origin = origin.trim().replaceAll("/$", "");
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        String origin = frontendUrl == null ? "" : frontendUrl.trim().replaceAll("/$", "");
+        List<String> allowedOrigins = new ArrayList<>();
+        if (!origin.isBlank()) {
+            allowedOrigins.add(origin);
         }
-        
-        // Use patterns to be safe
-        config.setAllowedOriginPatterns(List.of(origin));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
-        config.setExposedHeaders(List.of("Authorization"));
-        config.setAllowCredentials(true);
+        allowedOrigins.addAll(List.of(
+                "https://budgetwise-smart-budgeting.vercel.app",
+                "http://localhost:5173",
+                "http://localhost:4173",
+                "http://localhost:3000"
+        ));
 
-        source.registerCorsConfiguration("/**", config);
-        
-        FilterRegistrationBean<CorsFilter> bean = new FilterRegistrationBean<>(new CorsFilter(source));
-        bean.setOrder(Ordered.HIGHEST_PRECEDENCE);
-        return bean;
+        configuration.setAllowedOriginPatterns(allowedOrigins);
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setExposedHeaders(List.of("Authorization"));
+        configuration.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 
     @Bean

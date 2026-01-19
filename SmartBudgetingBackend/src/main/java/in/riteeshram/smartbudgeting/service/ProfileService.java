@@ -7,6 +7,7 @@ import in.riteeshram.smartbudgeting.repository.ProfileRepository;
 import in.riteeshram.smartbudgeting.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -32,9 +33,18 @@ public class ProfileService {
     private String activationURL;
 
     public ProfileDTO registerProfile(ProfileDTO profileDTO) {
+        if (profileRepository.existsByEmail(profileDTO.getEmail())) {
+            throw new IllegalArgumentException("Email already registered. Please log in or use a different email.");
+        }
+
         ProfileEntity newProfile = toEntity(profileDTO);
         newProfile.setActivationToken(UUID.randomUUID().toString());
-        newProfile = profileRepository.save(newProfile);
+        try {
+            newProfile = profileRepository.save(newProfile);
+        } catch (DataIntegrityViolationException ex) {
+            // Handle race conditions when the same email is inserted concurrently
+            throw new IllegalArgumentException("Email already registered. Please log in or use a different email.");
+        }
         //send activation email
         String activationLink = activationURL+"/api/v1.0/activate?token=" + newProfile.getActivationToken();
         String subject = "Activate your Money Manager account";

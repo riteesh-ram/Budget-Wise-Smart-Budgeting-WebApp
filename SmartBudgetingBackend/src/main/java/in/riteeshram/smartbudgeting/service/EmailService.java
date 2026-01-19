@@ -16,7 +16,7 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
-    @Value("${spring.mail.properties.mail.smtp.from}")
+    @Value("${spring.mail.properties.mail.smtp.from:riteeshram1701@gmail.com}")
     private String fromEmail;
 
     public void sendEmail(String to, String subject, String body) {
