@@ -67,7 +67,8 @@ const Signup = () => {
             }
         } catch(err) {
             console.error('Something went wrong', err);
-            setError(err.message);
+            const apiMessage = err?.response?.data?.message;
+            setError(apiMessage || "Registration failed. Please try again.");
         } finally {
             setIsLoading(false);
         }

@@ -35,6 +35,10 @@ axiosConfig.interceptors.response.use((response) => {
 }, (error) => {
     if(error.response) {
         if (error.response.status === 401) {
+            // clear stale token and redirect to login with optional message
+            localStorage.removeItem("token");
+            const message = error.response?.data?.message || "Session expired. Please log in again.";
+            console.warn(message);
             window.location.href = "/login";
         } else if (error.response.status === 500) {
             console.error("Server error. Please try again later");
