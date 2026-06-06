@@ -8,6 +8,7 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -19,6 +20,7 @@ public class EmailService {
     @Value("${spring.mail.properties.mail.smtp.from:riteeshram1701@gmail.com}")
     private String fromEmail;
 
+    @Async
     public void sendEmail(String to, String subject, String body) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
@@ -27,8 +29,9 @@ public class EmailService {
             message.setSubject(subject);
             message.setText(body);
             mailSender.send(message);
-        }catch (Exception e) {
-            throw new RuntimeException(e.getMessage());
+        } catch (Exception e) {
+            // email failure is logged but does not affect the registration response
+            System.err.println("Failed to send email to " + to + ": " + e.getMessage());
         }
     }
 
