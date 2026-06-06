@@ -15,5 +15,4 @@ COPY --from=build /app/target/*.jar app.jar
 # Standard Spring Boot port
 EXPOSE 8080
 
-# UPDATED LINE: Added -Djava.net.preferIPv4Stack=true to fix Render SMTP timeouts
-ENTRYPOINT ["java", "-Djava.net.preferIPv4Stack=true", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]
